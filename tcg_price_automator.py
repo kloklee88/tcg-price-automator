@@ -7,18 +7,19 @@ import requests
 import sys
 import webbrowser
 from selenium import webdriver
+from datetime import datetime
+from datetime import timedelta
 # from tkinter import *
 # from tkinter import font as tkFont
-# from datetime import datetime
-# from datetime import timedelta
 
 
 class Card:
-    def __init__(self, name, number, edition, condition, current_price, real_price, money_change, percent_change):
+    def __init__(self, name, number, edition, condition, quantity, current_price, real_price, money_change, percent_change):
         self.name = name
         self.number = number
         self.edition = edition
         self.condition = condition
+        self.quantity = quantity
         self.current_price = current_price
         self.real_price = real_price
         self.money_change = money_change
@@ -33,19 +34,19 @@ def read_csv():
         next(reader, None)  # Skips the header
         for row in reader:
             records.append(Card(row[0], row[1], row[2],
-                                row[3], row[4], row[5], row[6], row[7]))
+                                row[3], row[4], row[5], row[6], row[7], row[8]))
     return records
 
 
-def write_csv(cards):
+def write_csv(csv_name, cards):
     # Store records into CSV file
-    with open('listing.csv', 'w', newline='') as csvfile:
+    with open(csv_name, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(['Card Name', 'Setcode', 'Edition', 'Condition',
+        writer.writerow(['Card Name', 'Setcode', 'Edition', 'Condition', 'Quantity'
                          'Current Price', 'Real-est\u2122 Price', '$ Change', '% Change'])
         for card in cards:
             writer.writerow([card.name, card.number, card.edition,
-                             card.condition, card.current_price, card.real_price, card.money_change, card.percent_change])
+                             card.condition, card.quantity, card.current_price, card.real_price, card.money_change, card.percent_change])
 
 
 def determine_real_price(name, number, condition, edition):
@@ -61,13 +62,16 @@ def determine_real_price(name, number, condition, edition):
     filter_by_condition(driver, condition)
     time.sleep(1)
     product_listings = driver.find_elements_by_class_name('product-listing')
-    print(product_listings)
+    #print(product_listings)
     running_price = 0
     running_quantity = 0
     for product in product_listings:
-        edition = product.find_element_by_class_name(
+        condition_edition = product.find_element_by_class_name(
             'product-listing__condition').text
-        filter_by_edition(edition)
+        edition_parsed = filter_by_edition(condition_edition)
+        if edition_parsed == edition:
+            # TODO: finish filtering by edition
+            j = 0
         price = float(product.find_element_by_class_name(
             'product-listing__price').text.replace('$', ''))
         shipping = float(product.find_element_by_class_name('product-listing__shipping').text.replace(
@@ -85,6 +89,7 @@ def determine_real_price(name, number, condition, edition):
     real_price = round(running_price/running_quantity, 2)
     print(f'Real Price: {real_price}')
     return real_price
+
 
 def filter_by_edition(edition):
     if '1st Edition' in edition:
@@ -121,21 +126,34 @@ def determine_percent_change(original, new):
 
 def automate_price():
     print('Starting price automation script')
-    listing = []
-    inventory = read_csv()
-    for card in inventory:
-        real_price = determine_real_price(
-            card.name, card.number, card.condition, card.edition)
-        # Positive value means price increased, negative means price decreased
-        money_change = determine_money_change(
-            float(card.current_price), real_price)
-        percent_change = determine_percent_change(
-            float(card.current_price), real_price)
-        listing.append(Card(card.name, card.number, card.edition,
-                            card.condition, card.current_price, real_price, money_change, percent_change))
-    write_csv(listing)
-    print('Finished price automation script')
-    # TODO: Update the current_price someplace
+    start_time = datetime.now()
+    try:
+        listing = []
+        inventory_new = []
+        inventory = read_csv()
+        for card in inventory:
+            real_price = determine_real_price(
+                card.name, card.number, card.condition, card.edition)
+            # Positive value means price increased, negative means price decreased
+            money_change = determine_money_change(
+                float(card.current_price), real_price)
+            percent_change = determine_percent_change(
+                float(card.current_price), real_price)
+            listing.append(Card(card.name, card.number, card.edition,
+                                card.condition, card.quantity, card.current_price, real_price, money_change, percent_change))
+            # TODO: Need to get the quantity update from TCG API
+            inventory_new.append(Card(card.name, card.number, card.edition,
+                                      card.condition, card.quantity, real_price, 0, 0, 0))
+    except Exception as e:
+        print("ERROR! did not complete scraping")
+        print(e)
+        traceback.print_exc()
+    finally:
+        completion_time = datetime.now() - start_time
+        print(f'Time to complete (seconds): {completion_time.seconds}')
+        write_csv('listing.csv', listing)
+        write_csv('inventory-new.csv', listing)
+        print('Finished price automation script')
 
 
 # Run program
