@@ -42,7 +42,7 @@ def write_csv(csv_name, cards):
     # Store records into CSV file
     with open(csv_name, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(['Card Name', 'Setcode', 'Edition', 'Condition', 'Quantity'
+        writer.writerow(['Card Name', 'Setcode', 'Edition', 'Condition', 'Quantity',
                          'Current Price', 'Real-est\u2122 Price', '$ Change', '% Change'])
         for card in cards:
             writer.writerow([card.name, card.number, card.edition,
@@ -65,13 +65,16 @@ def determine_real_price(name, number, condition, edition):
     #print(product_listings)
     running_price = 0
     running_quantity = 0
+    running_price_1st = 0
+    running_quantity_1st = 0
+    running_price_unlimited = 0
+    running_quantity_unlimited = 0
     for product in product_listings:
         condition_edition = product.find_element_by_class_name(
             'product-listing__condition').text
         edition_parsed = filter_by_edition(condition_edition)
-        if edition_parsed == edition:
+        #if edition_parsed == edition:
             # TODO: finish filtering by edition
-            j = 0
         price = float(product.find_element_by_class_name(
             'product-listing__price').text.replace('$', ''))
         shipping = float(product.find_element_by_class_name('product-listing__shipping').text.replace(
@@ -85,8 +88,22 @@ def determine_real_price(name, number, condition, edition):
         # print(quantity)
         running_price += total_price*quantity
         running_quantity += quantity
-    print(f'Price={running_price}, quantity={running_quantity}')
+        if '1st Edition' in condition_edition:
+            running_price_1st += total_price*quantity
+            running_quantity_1st += quantity
+        elif 'Unlimited' in condition_edition:
+            running_price_unlimited += total_price*quantity
+            running_quantity_unlimited += quantity
+    print(f'Normal -> Price={running_price}, quantity={running_quantity}')
+    print(f'1st -> Price={running_price_1st}, quantity={running_quantity_1st}')
+    print(f'Unlimited -> Price={running_price_unlimited}, quantity={running_quantity_unlimited}')
     real_price = round(running_price/running_quantity, 2)
+    if running_quantity_1st != 0:
+        real_price_1st = round(running_price_1st/running_quantity_1st, 2)
+        print(f'Real Price 1st: {real_price_1st}')
+    if running_quantity_unlimited != 0:
+        real_price_unlimited = round(running_price_unlimited/running_quantity_unlimited, 2)
+        print(f'Real Price Unlimited: {real_price_unlimited}')
     print(f'Real Price: {real_price}')
     return real_price
 
