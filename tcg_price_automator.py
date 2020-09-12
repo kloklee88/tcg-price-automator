@@ -169,7 +169,7 @@ def automate_price():
         completion_time = datetime.now() - start_time
         print(f'Time to complete (seconds): {completion_time.seconds}')
         write_csv('listing.csv', listing)
-        write_csv('inventory-new.csv', listing)
+        write_csv('inventory-new.csv', inventory_new)
         print('Finished price automation script')
 
 
