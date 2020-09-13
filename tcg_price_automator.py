@@ -181,6 +181,9 @@ def automate_price():
             elif real_price == -8:
                 real_price = 0
                 notes = 'Less than 8 unique sellers'
+            elif real_price < 1.03:
+                real_price = 1.03
+                notes = 'Price floor was applied for this card'
             # Positive value means price increased, negative means price decreased
             money_change = determine_money_change(
                 float(card.current_price), real_price)
