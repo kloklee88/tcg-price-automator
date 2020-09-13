@@ -97,8 +97,8 @@ def determine_real_price(driver, name, condition, edition):
     print(f'1st -> Price={running_price_1st}, quantity={running_quantity_1st}')
     print(f'Unlimited -> Price={running_price_unlimited}, quantity={running_quantity_unlimited}')
     # If total quantity between all sellers is below 15, stop processing
-    if running_quantity < 15:
-        return -15
+    if running_quantity < 12:
+        return -12
     real_price = round(running_price/running_quantity, 2)
     if running_quantity_1st != 0:
         real_price_1st = round(running_price_1st/running_quantity_1st, 2)
@@ -142,15 +142,19 @@ def determine_money_change(original, new):
 def determine_percent_change(original, new):
     return round((new-original)/original, 2)
 
+# Global variable for now
+progress_value = 0
 
 def automate_price(filepath):
     print('Starting price automation script')
     start_time = datetime.now()
     try:
         listing = []
-        inventory_new = []
         inventory = read_csv(filepath)
-        for card in inventory:
+        for i,card in enumerate(inventory):
+            # Keep track of progress bar
+            progress_value = i/len(inventory)*100
+            print(f'Progress value: {progress_value}')
             # Use either the unique URL from CSV or construct it for first time
             url = None
             notes = None
@@ -176,15 +180,18 @@ def automate_price(filepath):
                 unique_url = driver.current_url
                 real_price = determine_real_price(driver, card.name, card.condition, card.edition)
             print(f'Unique URL: {unique_url}')
-            if real_price == -15:
+            if real_price == -12:
                 real_price = 0
-                notes = 'Total quantity less than 15'
+                notes = 'Total quantity less than 12'
             elif real_price == -8:
                 real_price = 0
                 notes = 'Less than 8 unique sellers'
-            elif real_price < 1.03:
+            elif real_price < 1.03 and not notes:
                 real_price = 1.03
                 notes = 'Price floor was applied for this card'
+            # Clean up selenium drivers
+            driver.close()
+            driver.quit()
             # Positive value means price increased, negative means price decreased
             money_change = determine_money_change(
                 float(card.current_price), real_price)
@@ -199,8 +206,7 @@ def automate_price(filepath):
     finally:
         completion_time = datetime.now() - start_time
         print(f'Time to complete (seconds): {completion_time.seconds}')
-        write_csv('listing.csv', listing)
-        write_csv('inventory-new.csv', inventory_new)
+        write_csv('output.csv', listing)
         print('Finished price automation script')
         return True
 
@@ -217,30 +223,39 @@ def upload_tcg():
 ###################
 class Window(Frame):
     def __init__(self, master=None):
-        Frame.__init__(self, master)                 
+        ttk.Frame.__init__(self, master)         
         self.master = master
         self.init_window()
 
     def init_window(self, side=LEFT, anchor=W):
-        self.master.title("TCG Price Automator")
+        self.master.title('TCG Price Automator')
         self.pack(fill=BOTH, expand=1)
-        self.filepath = StringVar(value='')
+
+        self.content = ttk.Frame(self, padding=(10,10,10,10))
+        self.content.pack(fill=BOTH, expand=1)
+
+        self.filepath = StringVar(value='inventory.csv')
         self.response = StringVar()
         self.determine_price = IntVar(value=1)
         self.upload_tcg = IntVar(value=1)
-        ttk.Label(self, text="Inventory CSV:").grid(row=0,column=0,sticky=W)
-        self.choose_file_entry = ttk.Entry(self, textvariable=self.filepath, width=30)
+        ttk.Label(self.content, text='Inventory CSV:').grid(row=0,column=0,sticky=W)
+        self.choose_file_entry = ttk.Entry(self.content, textvariable=self.filepath, width=30)
         self.choose_file_entry.grid(row=0,column=1,sticky=W)
-        ttk.Button(self, text="Choose File", command=self.choose_file).grid(row=0,column=2,sticky=W)
+        ttk.Button(self.content, text='Choose File', command=self.choose_file).grid(row=0,column=2,sticky=W)
 
-        ttk.Label(self, text="Options:").grid(row=1,column=0,sticky=W)
-        ttk.Checkbutton(self, text='Determine Price', variable=self.determine_price).grid(row=2,column=0,sticky=W)
-        ttk.Checkbutton(self, text='Upload to TCG', variable=self.upload_tcg).grid(row=3,column=0,sticky=W)
+        ttk.Label(self.content, text='').grid(row=1,column=0,sticky=W)
+        self.labelframe = ttk.LabelFrame(self.content, text='Options')
+        self.labelframe.grid(row=2,column=0,sticky=W)
+        ttk.Checkbutton(self.labelframe, text='Determine Price', variable=self.determine_price).grid(row=3,column=0,sticky=W)
+        ttk.Checkbutton(self.labelframe, text='Upload to TCG', variable=self.upload_tcg).grid(row=4,column=0,sticky=W)
+        
+        self.progress = ttk.Progressbar(self.content, length=380, mode='determinate', variable=progress_value)
+        self.progress.place(relx=0.5, rely=0.45, anchor=CENTER)
 
-        ttk.Label(self, textvariable=self.response).place(relx=0.5, rely=0.6, anchor=CENTER)
+        ttk.Label(self.content, textvariable=self.response).place(relx=0.5, rely=0.55, anchor=CENTER)
 
-        ttk.Button(self, text="Run",command=self.run, width=15).place(relx=0.5, rely=0.7, anchor=CENTER)
-        ttk.Button(self, text="Exit",command=self.client_exit, width=15).place(relx=0.5, rely=0.8, anchor=CENTER)
+        ttk.Button(self.content, text='Run',command=self.run, width=15).place(relx=0.5, rely=0.7, anchor=CENTER)
+        ttk.Button(self.content, text='Exit',command=self.client_exit, width=15).place(relx=0.5, rely=0.8, anchor=CENTER)
     
     def choose_file(self):
         filename = filedialog.askopenfilename(filetypes = (("CSV", "*.csv"), ("All files", "*")))
@@ -269,7 +284,7 @@ class Window(Frame):
         
 
 root = Tk()
-root.geometry("400x250")
+root.geometry("400x325")
 root.style = ttk.Style()
 root.style.theme_use("vista")
 app = Window(root)
