@@ -14,7 +14,7 @@ from datetime import timedelta
 
 
 class Card:
-    def __init__(self, name, number, edition, condition, quantity, current_price, real_price, money_change, percent_change):
+    def __init__(self, name, number, edition, condition, quantity, current_price, real_price, money_change, percent_change, link_option, unique_link, notes):
         self.name = name
         self.number = number
         self.edition = edition
@@ -24,6 +24,9 @@ class Card:
         self.real_price = real_price
         self.money_change = money_change
         self.percent_change = percent_change
+        self.link_option = link_option
+        self.unique_link = unique_link
+        self.notes = notes
 
 
 def read_csv():
@@ -34,7 +37,7 @@ def read_csv():
         next(reader, None)  # Skips the header
         for row in reader:
             records.append(Card(row[0], row[1], row[2],
-                                row[3], row[4], row[5], row[6], row[7], row[8]))
+                                row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11]))
     return records
 
 
@@ -43,21 +46,13 @@ def write_csv(csv_name, cards):
     with open(csv_name, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(['Card Name', 'Setcode', 'Edition', 'Condition', 'Quantity',
-                         'Current Price', 'Real-est\u2122 Price', '$ Change', '% Change'])
+                         'Current Price', 'Real-est\u2122 Price', '$ Change', '% Change', 'Link Option', 'Unique Link', 'Notes'])
         for card in cards:
             writer.writerow([card.name, card.number, card.edition,
-                             card.condition, card.quantity, card.current_price, card.real_price, card.money_change, card.percent_change])
+                             card.condition, card.quantity, card.current_price, card.real_price, card.money_change, card.percent_change, card.link_option, card.unique_link, card.notes])
 
 
-def determine_real_price(name, number, condition, edition):
-    # Scrape TCG Player site first page listing to determine real-est price
-    print(f'Determining real-est price for card: {name} / {number}')
-    # Using Selenium to select dynamic content
-    url = 'https://shop.tcgplayer.com/yugioh/product/show?advancedSearch=true&Number='
-    driver = webdriver.Chrome()
-    driver.get(url + number)
-    # Click on first element of search results, assuming that there is only ONE item in list
-    driver.find_elements_by_class_name('product__image')[0].click()
+def determine_real_price(driver, name, condition, edition):
     time.sleep(1)
     filter_by_condition(driver, condition)
     time.sleep(1)
@@ -69,6 +64,9 @@ def determine_real_price(name, number, condition, edition):
     running_quantity_1st = 0
     running_price_unlimited = 0
     running_quantity_unlimited = 0
+    # If less than unique individual seller, stop processing
+    if len(product_listings) < 8:
+        return -8
     for product in product_listings:
         condition_edition = product.find_element_by_class_name(
             'product-listing__condition').text
@@ -97,6 +95,9 @@ def determine_real_price(name, number, condition, edition):
     print(f'Normal -> Price={running_price}, quantity={running_quantity}')
     print(f'1st -> Price={running_price_1st}, quantity={running_quantity_1st}')
     print(f'Unlimited -> Price={running_price_unlimited}, quantity={running_quantity_unlimited}')
+    # If total quantity between all sellers is below 15, stop processing
+    if running_quantity < 15:
+        return -15
     real_price = round(running_price/running_quantity, 2)
     if running_quantity_1st != 0:
         real_price_1st = round(running_price_1st/running_quantity_1st, 2)
@@ -149,18 +150,47 @@ def automate_price():
         inventory_new = []
         inventory = read_csv()
         for card in inventory:
-            real_price = determine_real_price(
-                card.name, card.number, card.condition, card.edition)
+            # Use either the unique URL from CSV or construct it for first time
+            url = None
+            notes = None
+            if not card.unique_link:
+                url = 'https://shop.tcgplayer.com/yugioh/product/show?advancedSearch=true&Number=' + card.number
+            else:
+                url = card.unique_link
+            print(f'URL searched: {url}')
+            # Scrape TCG Player site first page listing to determine real-est price
+            print(f'Determining real-est price for card: {card.name} / {card.number}')
+            # Using Selenium to select dynamic content
+            driver = webdriver.Chrome()
+            driver.get(url)
+            unique_url = None
+            item_num = len(driver.find_elements_by_class_name('product__image'))
+            print(f'Number of items on search page: {item_num}')
+            if item_num > 1:
+                real_price = 0
+                notes = 'Multiple links when searching. Requires user selection'
+            else:
+                # Click on first element of search results, assuming that there is only ONE item in list
+                driver.find_elements_by_class_name('product__image')[0].click()
+                unique_url = driver.current_url
+                real_price = determine_real_price(driver, card.name, card.condition, card.edition)
+            print(f'Unique URL: {unique_url}')
+            if real_price == -15:
+                real_price = 0
+                notes = 'Total quantity less than 15'
+            elif real_price == -8:
+                real_price = 0
+                notes = 'Less than 8 unique sellers'
             # Positive value means price increased, negative means price decreased
             money_change = determine_money_change(
                 float(card.current_price), real_price)
             percent_change = determine_percent_change(
                 float(card.current_price), real_price)
             listing.append(Card(card.name, card.number, card.edition,
-                                card.condition, card.quantity, card.current_price, real_price, money_change, percent_change))
+                                card.condition, card.quantity, card.current_price, real_price, money_change, percent_change, url, unique_url, notes))
             # TODO: Need to get the quantity update from TCG API
             inventory_new.append(Card(card.name, card.number, card.edition,
-                                      card.condition, card.quantity, real_price, 0, 0, 0))
+                                      card.condition, card.quantity, real_price, 0, 0, 0, url, unique_url, notes))
     except Exception as e:
         print("ERROR! did not complete scraping")
         print(e)
