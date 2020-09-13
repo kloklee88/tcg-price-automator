@@ -10,7 +10,7 @@ from selenium import webdriver
 from datetime import datetime
 from datetime import timedelta
 from tkinter import *
-from tkinter import ttk
+from tkinter import ttk, filedialog
 
 
 class Card:
@@ -29,10 +29,11 @@ class Card:
         self.notes = notes
 
 
-def read_csv():
+def read_csv(filepath):
     # Read records into CSV
+    print(f'Reading CSV from {filepath}')
     records = []
-    with open('inventory.csv', newline='') as csvfile:
+    with open(filepath, newline='') as csvfile:
         reader = csv.reader(csvfile)
         next(reader, None)  # Skips the header
         for row in reader:
@@ -142,13 +143,13 @@ def determine_percent_change(original, new):
     return round((new-original)/original, 2)
 
 
-def automate_price():
+def automate_price(filepath):
     print('Starting price automation script')
     start_time = datetime.now()
     try:
         listing = []
         inventory_new = []
-        inventory = read_csv()
+        inventory = read_csv(filepath)
         for card in inventory:
             # Use either the unique URL from CSV or construct it for first time
             url = None
@@ -221,25 +222,38 @@ class Window(Frame):
     def init_window(self, side=LEFT, anchor=W):
         self.master.title("TCG Price Automator")
         self.pack(fill=BOTH, expand=1)
+        self.filepath = StringVar(value='')
         self.determine_price = IntVar(value=1)
         self.upload_tcg = IntVar(value=1)
-        ttk.Label(self, text="Options:").grid(row=0,column=0,sticky=W)
-        ttk.Checkbutton(self, text='Determine Price', variable=self.determine_price).grid(row=1,column=0,sticky=W)
-        ttk.Checkbutton(self, text='Upload to TCG', variable=self.upload_tcg).grid(row=2,column=0,sticky=W)
+        ttk.Label(self, text="Inventory CSV:").grid(row=0,column=0,sticky=W)
+        self.choose_file_entry = ttk.Entry(self, textvariable=self.filepath, width=30)
+        self.choose_file_entry.grid(row=0,column=1,sticky=W)
+        ttk.Button(self, text="Choose File", command=self.choose_file).grid(row=0,column=2,sticky=W)
+
+        ttk.Label(self, text="Options:").grid(row=1,column=0,sticky=W)
+        ttk.Checkbutton(self, text='Determine Price', variable=self.determine_price).grid(row=2,column=0,sticky=W)
+        ttk.Checkbutton(self, text='Upload to TCG', variable=self.upload_tcg).grid(row=3,column=0,sticky=W)
+
         ttk.Button(self, text="Run",command=self.run, width=15).place(relx=0.5, rely=0.7, anchor=CENTER)
         ttk.Button(self, text="Exit",command=self.client_exit, width=15).place(relx=0.5, rely=0.8, anchor=CENTER)
     
+    def choose_file(self):
+        filename = filedialog.askopenfilename(filetypes = (("CSV", "*.csv"), ("All files", "*")))
+        print(filename)
+        self.choose_file_entry.delete(0, END)
+        self.choose_file_entry.insert(0, filename)
+
     def client_exit(self):
         exit()
 
     def run(self):
         if self.determine_price.get():
-            automate_price()
+            automate_price(self.choose_file_entry.get()) # Pass CSV filepath
         if self.upload_tcg.get():
             upload_tcg()
 
 root = Tk()
-root.geometry("300x250")
+root.geometry("400x250")
 root.style = ttk.Style()
 root.style.theme_use("vista")
 app = Window(root)
