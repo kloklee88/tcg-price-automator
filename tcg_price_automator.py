@@ -9,8 +9,8 @@ import webbrowser
 from selenium import webdriver
 from datetime import datetime
 from datetime import timedelta
-# from tkinter import *
-# from tkinter import font as tkFont
+from tkinter import *
+from tkinter import ttk
 
 
 class Card:
@@ -191,9 +191,6 @@ def automate_price():
                 float(card.current_price), real_price)
             listing.append(Card(card.name, card.number, card.edition,
                                 card.condition, card.quantity, card.current_price, real_price, money_change, percent_change, url, unique_url, notes))
-            # TODO: Need to get the quantity update from TCG API
-            inventory_new.append(Card(card.name, card.number, card.edition,
-                                      card.condition, card.quantity, real_price, 0, 0, 0, url, unique_url, notes))
     except Exception as e:
         print("ERROR! did not complete scraping")
         print(e)
@@ -205,6 +202,45 @@ def automate_price():
         write_csv('inventory-new.csv', inventory_new)
         print('Finished price automation script')
 
+def upload_tcg():
+    print('Uploading to TCG Player...')
+    # TODO: Need to get the quantity update from TCG API
+    #inventory_new.append(Card(card.name, card.number, card.edition,
+    #                          card.condition, card.quantity, real_price, 0, 0, 0, url, unique_url, notes))
 
-# Run program
-automate_price()
+
+###################
+# GUI 
+###################
+class Window(Frame):
+    def __init__(self, master=None):
+        Frame.__init__(self, master)                 
+        self.master = master
+        self.init_window()
+
+    def init_window(self, side=LEFT, anchor=W):
+        self.master.title("TCG Price Automator")
+        self.pack(fill=BOTH, expand=1)
+        self.determine_price = IntVar(value=1)
+        self.upload_tcg = IntVar(value=1)
+        ttk.Label(self, text="Options:").grid(row=0,column=0,sticky=W)
+        ttk.Checkbutton(self, text='Determine Price', variable=self.determine_price).grid(row=1,column=0,sticky=W)
+        ttk.Checkbutton(self, text='Upload to TCG', variable=self.upload_tcg).grid(row=2,column=0,sticky=W)
+        ttk.Button(self, text="Run",command=self.run, width=15).place(relx=0.5, rely=0.7, anchor=CENTER)
+        ttk.Button(self, text="Exit",command=self.client_exit, width=15).place(relx=0.5, rely=0.8, anchor=CENTER)
+    
+    def client_exit(self):
+        exit()
+
+    def run(self):
+        if self.determine_price.get():
+            automate_price()
+        if self.upload_tcg.get():
+            upload_tcg()
+
+root = Tk()
+root.geometry("300x250")
+root.style = ttk.Style()
+root.style.theme_use("vista")
+app = Window(root)
+root.mainloop() 
