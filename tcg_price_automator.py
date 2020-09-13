@@ -202,12 +202,14 @@ def automate_price(filepath):
         write_csv('listing.csv', listing)
         write_csv('inventory-new.csv', inventory_new)
         print('Finished price automation script')
+        return True
 
 def upload_tcg():
     print('Uploading to TCG Player...')
     # TODO: Need to get the quantity update from TCG API
     #inventory_new.append(Card(card.name, card.number, card.edition,
     #                          card.condition, card.quantity, real_price, 0, 0, 0, url, unique_url, notes))
+    return True
 
 
 ###################
@@ -223,6 +225,7 @@ class Window(Frame):
         self.master.title("TCG Price Automator")
         self.pack(fill=BOTH, expand=1)
         self.filepath = StringVar(value='')
+        self.response = StringVar()
         self.determine_price = IntVar(value=1)
         self.upload_tcg = IntVar(value=1)
         ttk.Label(self, text="Inventory CSV:").grid(row=0,column=0,sticky=W)
@@ -233,6 +236,8 @@ class Window(Frame):
         ttk.Label(self, text="Options:").grid(row=1,column=0,sticky=W)
         ttk.Checkbutton(self, text='Determine Price', variable=self.determine_price).grid(row=2,column=0,sticky=W)
         ttk.Checkbutton(self, text='Upload to TCG', variable=self.upload_tcg).grid(row=3,column=0,sticky=W)
+
+        ttk.Label(self, textvariable=self.response).place(relx=0.5, rely=0.6, anchor=CENTER)
 
         ttk.Button(self, text="Run",command=self.run, width=15).place(relx=0.5, rely=0.7, anchor=CENTER)
         ttk.Button(self, text="Exit",command=self.client_exit, width=15).place(relx=0.5, rely=0.8, anchor=CENTER)
@@ -247,10 +252,21 @@ class Window(Frame):
         exit()
 
     def run(self):
+        result = ''
+        if not self.choose_file_entry.get():
+            print('Inventory entry is empty')
+            self.response.set('Inventory CSV is empty! Please choose a file!!')
+            return
         if self.determine_price.get():
-            automate_price(self.choose_file_entry.get()) # Pass CSV filepath
+            completed_price = automate_price(self.choose_file_entry.get()) # Pass CSV filepath
+            if completed_price == True:
+                result += 'Inventory prices have been updated!\n'
         if self.upload_tcg.get():
-            upload_tcg()
+            completed_upload = upload_tcg()
+            if completed_upload == True:
+                result += 'Listings have been uploaded to TCG!'
+        self.response.set(result)
+        
 
 root = Tk()
 root.geometry("400x250")
