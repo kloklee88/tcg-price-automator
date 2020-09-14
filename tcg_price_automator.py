@@ -257,6 +257,8 @@ class Window(Frame):
 
     def init_window(self, side=LEFT, anchor=W):
         self.master.title('TCG Price Automator')
+        photo = PhotoImage(file ='upstart_goblin.png')
+        self.master.iconphoto(False, photo)
         self.pack(fill=BOTH, expand=1)
 
         self.content = ttk.Frame(self, padding=(10,10,10,10))
