@@ -7,6 +7,9 @@ import requests
 import sys
 import webbrowser
 from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
 from datetime import timedelta
 from tkinter import *
@@ -54,9 +57,10 @@ def write_csv(csv_name, cards):
 
 
 def determine_real_price(driver, name, condition, edition):
-    time.sleep(1)
     filter_by_condition(driver, condition)
-    time.sleep(1)
+    WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.CLASS_NAME, 'product-listing'))
+    )
     product_listings = driver.find_elements_by_class_name('product-listing')
     #print(product_listings)
     running_price = 0
@@ -164,11 +168,15 @@ def automate_price(filepath):
                 url = card.unique_link
             print(f'URL searched: {url}')
             # Scrape TCG Player site first page listing to determine real-est price
-            print(f'Determining real-est price for card: {card.name} / {card.number}')
+            print(f'Determining real-est price for card: {card.number}')
             # Using Selenium to select dynamic content
             driver = webdriver.Chrome()
             driver.get(url)
             unique_url = None
+            updated_card_name = None
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.CLASS_NAME, 'product__image'))
+            )
             item_num = len(driver.find_elements_by_class_name('product__image'))
             print(f'Number of items on search page: {item_num}')
             if item_num > 1:
@@ -178,6 +186,19 @@ def automate_price(filepath):
                 # Click on first element of search results, assuming that there is only ONE item in list
                 driver.find_elements_by_class_name('product__image')[0].click()
                 unique_url = driver.current_url
+                if not card.name:
+                    WebDriverWait(driver, 10).until(
+                        EC.presence_of_element_located((By.CLASS_NAME, 'product-details__name'))
+                    )
+                    updated_card_name = driver.find_elements_by_class_name('product-details__name')[0].text
+                    print(f'Getting card name: {updated_card_name}')
+                    card.name = updated_card_name
+                if not card.condition:
+                    print(f'Filling in Near Mint')
+                    card.condition = 'Near Mint'
+                if not card.edition:
+                    print(f'Filling in 1st Edition')
+                    card.edition = '1st Edition'
                 real_price = determine_real_price(driver, card.name, card.condition, card.edition)
             print(f'Unique URL: {unique_url}')
             if real_price == -12:
@@ -192,30 +213,35 @@ def automate_price(filepath):
             # Clean up selenium drivers
             driver.close()
             driver.quit()
-            # Positive value means price increased, negative means price decreased
-            money_change = determine_money_change(
-                float(card.current_price), real_price)
-            percent_change = determine_percent_change(
-                float(card.current_price), real_price)
+            # Positive value means price increased, negative means price decreased. Only output if current price exist
+            money_change = 0
+            percent_change = 0
+            if card.current_price:
+                money_change = determine_money_change(
+                    float(card.current_price), real_price)
+                percent_change = determine_percent_change(
+                    float(card.current_price), real_price)
             listing.append(Card(card.name, card.number, card.edition,
                                 card.condition, card.quantity, card.current_price, real_price, money_change, percent_change, url, unique_url, notes))
+            message = 'Inventory prices have been updated!\n'
     except Exception as e:
         print("ERROR! did not complete scraping")
         print(e)
+        message = 'ERROR! Did not fully complete determining price'
         traceback.print_exc()
     finally:
         completion_time = datetime.now() - start_time
         print(f'Time to complete (seconds): {completion_time.seconds}')
         write_csv('output.csv', listing)
         print('Finished price automation script')
-        return True
+        return message
 
 def upload_tcg():
     print('Uploading to TCG Player...')
     # TODO: Need to get the quantity update from TCG API
     #inventory_new.append(Card(card.name, card.number, card.edition,
     #                          card.condition, card.quantity, real_price, 0, 0, 0, url, unique_url, notes))
-    return True
+    return 'Listings have been uploaded to TCG!'
 
 
 ###################
@@ -234,7 +260,7 @@ class Window(Frame):
         self.content = ttk.Frame(self, padding=(10,10,10,10))
         self.content.pack(fill=BOTH, expand=1)
 
-        self.filepath = StringVar(value='inventory.csv')
+        self.filepath = StringVar(value='inventory-new.csv')
         self.response = StringVar()
         self.determine_price = IntVar(value=1)
         self.upload_tcg = IntVar(value=1)
@@ -273,13 +299,9 @@ class Window(Frame):
             self.response.set('Inventory CSV is empty! Please choose a file!!')
             return
         if self.determine_price.get():
-            completed_price = automate_price(self.choose_file_entry.get()) # Pass CSV filepath
-            if completed_price == True:
-                result += 'Inventory prices have been updated!\n'
+            result += automate_price(self.choose_file_entry.get()) # Pass CSV filepath
         if self.upload_tcg.get():
-            completed_upload = upload_tcg()
-            if completed_upload == True:
-                result += 'Listings have been uploaded to TCG!'
+            result += upload_tcg()
         self.response.set(result)
         
 
