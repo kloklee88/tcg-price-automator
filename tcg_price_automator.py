@@ -190,7 +190,8 @@ def automate_price(filepath):
                     WebDriverWait(driver, 10).until(
                         EC.presence_of_element_located((By.CLASS_NAME, 'product-details__name'))
                     )
-                    updated_card_name = driver.find_elements_by_class_name('product-details__name')[0].text
+                    updated_card_name = driver.find_elements_by_class_name('product-details__name')[1].text
+                    #print(driver.find_elements_by_class_name('product-details__name')[0])
                     print(f'Getting card name: {updated_card_name}')
                     card.name = updated_card_name
                 if not card.condition:
@@ -212,7 +213,7 @@ def automate_price(filepath):
                 notes = 'Price floor was applied for this card'
             # Clean up selenium drivers
             driver.close()
-            driver.quit()
+            #driver.quit()
             # Positive value means price increased, negative means price decreased. Only output if current price exist
             money_change = 0
             percent_change = 0
@@ -233,6 +234,7 @@ def automate_price(filepath):
         completion_time = datetime.now() - start_time
         print(f'Time to complete (seconds): {completion_time.seconds}')
         write_csv('output.csv', listing)
+        driver.quit()
         print('Finished price automation script')
         return message
 
