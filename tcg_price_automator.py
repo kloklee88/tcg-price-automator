@@ -15,6 +15,7 @@ from datetime import datetime
 from datetime import timedelta
 from tkinter import *
 from tkinter import ttk, filedialog
+from ttkthemes import ThemedTk, ThemedStyle
 
 
 class Card:
@@ -329,7 +330,8 @@ class Window(Frame):
 
 root = Tk()
 root.geometry("400x350")
-root.style = ttk.Style()
-root.style.theme_use("vista")
+root.style = ThemedStyle()
+print(f'Available themes: {root.style.theme_names()}')
+root.style.theme_use("itft1")
 app = Window(root)
 root.mainloop()
