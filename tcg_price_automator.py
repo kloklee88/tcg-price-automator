@@ -6,6 +6,7 @@ import traceback
 import requests
 import sys
 import webbrowser
+import threading
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -81,7 +82,7 @@ def determine_real_price(driver, name, condition, edition):
         price = float(product.find_element_by_class_name(
             'product-listing__price').text.replace('$', ''))
         shipping = float(product.find_element_by_class_name('product-listing__shipping').text.replace(
-            'Free Shipping on Orders Over $5', '').replace('+ Shipping:', '').replace('Included', '').replace('$', ''))
+            'Free Shipping on Orders Over $5', '').replace('+ Shipping:', '').replace('Included', '0').replace('$', ''))
         total_price = price + shipping
         quantity = int(product.find_element_by_id(
             'quantityAvailable').get_attribute('value'))
@@ -146,7 +147,7 @@ def determine_money_change(original, new):
 def determine_percent_change(original, new):
     return round((new-original)/original, 2)
 
-def automate_price(filepath, use_new_records):
+def automate_price(filepath, use_new_records, progress_bar, progress_percent):
     print('Starting price automation script')
     start_time = datetime.now()
     progress_value = 0
@@ -156,8 +157,11 @@ def automate_price(filepath, use_new_records):
         for i,card in enumerate(inventory):
             # Keep track of progress bar
             progress_value = i/len(inventory)*100
+            progress_bar['value'] = progress_value
+            progress_percent['text'] = f'{round(progress_value,2)}%'
             print(f'Progress value: {progress_value}')
             # Only process if use_new_records is false OR if new record and the card name is empty
+            print(f'Only using new records: {use_new_records}')
             if (use_new_records and not card.name) or not use_new_records:
                 # Use either the unique URL from CSV or construct it for first time
                 url = None
@@ -174,17 +178,20 @@ def automate_price(filepath, use_new_records):
                 driver.get(url)
                 unique_url = None
                 updated_card_name = None
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.CLASS_NAME, 'product__image'))
-                )
-                item_num = len(driver.find_elements_by_class_name('product__image'))
-                print(f'Number of items on search page: {item_num}')
-                if item_num > 1:
+                item_num = 0
+                if not card.unique_link:
+                    WebDriverWait(driver, 10).until(
+                        EC.presence_of_element_located((By.CLASS_NAME, 'product__image'))
+                    )
+                    item_num = len(driver.find_elements_by_class_name('product__image'))
+                    print(f'Number of items on search page: {item_num}')
+                if item_num > 1 or not card.unique_link:
                     real_price = 0
                     notes = 'Multiple links when searching. Requires user selection'
                 else:
                     # Click on first element of search results, assuming that there is only ONE item in list
-                    driver.find_elements_by_class_name('product__image')[0].click()
+                    if not card.unique_link:
+                        driver.find_elements_by_class_name('product__image')[0].click()
                     unique_url = driver.current_url
                     if not card.name:
                         WebDriverWait(driver, 10).until(
@@ -226,7 +233,7 @@ def automate_price(filepath, use_new_records):
     except Exception as e:
         print("ERROR! did not complete scraping")
         print(e)
-        message = 'ERROR! Did not fully complete determining price'
+        message = 'ERROR! Did not fully complete determining price\n'
         traceback.print_exc()
     finally:
         completion_time = datetime.now() - start_time
@@ -281,13 +288,15 @@ class Window(Frame):
         ttk.Checkbutton(self.labelframe, text='Upload to TCG', variable=self.upload_tcg).grid(row=2,column=0,sticky=W)
         ttk.Checkbutton(self.labelframe, text='Use only new records', variable=self.use_new_records).grid(row=3,column=0,sticky=W)
         
-        self.progress = ttk.Progressbar(self.content, length=380, mode='determinate')
+        self.progress = ttk.Progressbar(self.content, length=350, mode='determinate')
         self.progress.place(relx=0.5, rely=0.5, anchor=CENTER)
+        self.progress_percent = ttk.Label(self.content, text='')
+        self.progress_percent.place(relx=0.5, rely=0.575, anchor=CENTER)
 
-        ttk.Label(self.content, textvariable=self.response).place(relx=0.5, rely=0.6, anchor=CENTER)
+        ttk.Label(self.content, textvariable=self.response).place(relx=0.5, rely=0.7, anchor=CENTER)
 
-        ttk.Button(self.content, text='Run',command=self.run, width=15).place(relx=0.5, rely=0.8, anchor=CENTER)
-        ttk.Button(self.content, text='Exit',command=self.client_exit, width=15).place(relx=0.5, rely=0.9, anchor=CENTER)
+        ttk.Button(self.content, text='Run',command=self.process, width=15).place(relx=0.5, rely=0.85, anchor=CENTER)
+        ttk.Button(self.content, text='Exit',command=self.client_exit, width=15).place(relx=0.5, rely=0.95, anchor=CENTER)
     
     def choose_file(self):
         filename = filedialog.askopenfilename(filetypes = (("CSV", "*.csv"), ("All files", "*")))
@@ -300,26 +309,27 @@ class Window(Frame):
 
     def run(self):
         result = ''
-        self.progress.start()
-        #self.progress['value']=1
+        self.response.set(result)
         if not self.choose_file_entry.get():
             print('Inventory entry is empty')
             self.response.set('Inventory CSV is empty! Please choose a file!!')
             return
-        if self.determine_price.get():
-            #self.progress['value']=10
-            result += automate_price(self.choose_file_entry.get(), self.use_new_records) # Pass CSV filepath
-            #self.progress['value']=50
-        if self.upload_tcg.get():
+        if self.determine_price.get(): 
+            result += automate_price(self.choose_file_entry.get(), self.use_new_records.get(), self.progress, self.progress_percent) # Pass CSV filepath
+        if self.upload_tcg.get() and 'ERROR' not in result:
             result += upload_tcg()
-            #self.progress['value']=100
-        self.progress.stop()
+        self.progress_percent['text']='100%'
+        self.progress['value']=100
         self.response.set(result)
+
+    def process(self):
+        control_thread = threading.Thread(target=self.run, daemon=True)
+        control_thread.start()
         
 
 root = Tk()
-root.geometry("400x325")
+root.geometry("400x350")
 root.style = ttk.Style()
 root.style.theme_use("vista")
 app = Window(root)
-root.mainloop() 
+root.mainloop()
