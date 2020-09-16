@@ -270,7 +270,7 @@ class Window(Frame):
         self.master.iconphoto(False, photo)
         self.pack(fill=BOTH, expand=1)
 
-        self.content = ttk.Frame(self, padding=(10,10,10,10))
+        self.content = ttk.Frame(self, padding=(5,5,5,5))
         self.content.pack(fill=BOTH, expand=1)
 
         pic = Image.open("background_dragon.png")
@@ -285,10 +285,12 @@ class Window(Frame):
         self.determine_price = IntVar(value=1)
         self.upload_tcg = IntVar(value=1)
         self.use_new_records = IntVar(value=0)
-        ttk.Label(self.content, text='Inventory CSV:').grid(row=0,column=0,sticky=W)
-        self.choose_file_entry = ttk.Entry(self.content, textvariable=self.filepath, width=30)
-        self.choose_file_entry.grid(row=0,column=1,sticky=W)
-        ttk.Button(self.content, text='Choose File', command=self.choose_file).grid(row=0,column=2,sticky=W)
+
+        self.choose_file_frame = ttk.Frame(self.content)
+        self.choose_file_frame.place(relx=0.5, rely=0.1, anchor=CENTER)
+        self.choose_file_entry = ttk.Entry(self.choose_file_frame, textvariable=self.filepath, width=30)
+        self.choose_file_entry.grid(row=0,column=0,sticky=W)
+        ttk.Button(self.choose_file_frame, text='Choose CSV File', command=self.choose_file).grid(row=0,column=1,sticky=W)
 
         ttk.Label(self.content, text='').grid(row=1,column=0,sticky=W)
         self.labelframe = ttk.LabelFrame(self.content, text='Options')
