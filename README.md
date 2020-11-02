@@ -6,7 +6,7 @@ Inside the dist folder, double click the tcg_price_automator.exe and let the scr
 
 > Note: You may need to install a different chromedriver.exe that matches your current version of Chrome [here](https://chromedriver.chromium.org/downloads). Make sure to place this in dist folder!
 
-### Installation
+### Installation (ONLY REQUIRED IF YOU WANT TO WORK ON PROJECT)
 Install latest version of [Python](https://www.python.org/downloads/) 
 
 Navigate to the folder of the apple_product_scraper in command line/terminal
