@@ -17,6 +17,7 @@ from tkinter import *
 from tkinter import ttk, filedialog
 from ttkthemes import ThemedTk, ThemedStyle
 from PIL import Image, ImageTk
+import getpass
 
 
 class Card:
@@ -247,12 +248,39 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
         print('Finished price automation script')
         return message
 
-def upload_tcg():
-    print('Uploading to TCG Player...')
-    # TODO: Need to get the quantity update from TCG API
-    #inventory_new.append(Card(card.name, card.number, card.edition,
-    #                          card.condition, card.quantity, real_price, 0, 0, 0, url, unique_url, notes))
-    return 'Listings have been uploaded to TCG!'
+def upload_tcg(filepath):
+    print('Starting uploading to TCG Player')
+    start_time = datetime.now()
+    url = 'https://store.tcgplayer.com/login?returnUrl=www.tcgplayer.com/'
+    driver = webdriver.Chrome()
+    driver.get(url)
+    # Sign in
+    #email = driver.find_elements_by_id('Email')
+    #password = driver.find_elements_by_id('Password')
+    #email.send_keys('username') 
+    #password.send_keys('password')
+    # Make selenium user pause here
+    WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.ID, 'Email'))
+    )
+    WebDriverWait(driver, 10).until(lambda driver: driver.find_elements_by_class_name('test'))
+    try:
+        listing = []
+        inventory = read_csv(filepath)
+        #for i,card in enumerate(inventory):
+        #    print('TEST')
+        message = 'Listings have been uploaded to TCG!'
+    except Exception as e:
+        print("ERROR! did not complete upload")
+        print(e)
+        message = 'ERROR! Did not fully complete uploading to TCG\n'
+        traceback.print_exc()
+    finally:
+        completion_time = datetime.now() - start_time
+        print(f'Time to complete upload (seconds): {completion_time.seconds}')
+        #progress_value = 100
+        print('Finished upload automation script')
+        return message
 
 
 ###################
@@ -328,7 +356,7 @@ class Window(Frame):
         if self.determine_price.get(): 
             result += automate_price(self.choose_file_entry.get(), self.use_new_records.get(), self.progress, self.progress_percent) # Pass CSV filepath
         if self.upload_tcg.get() and 'ERROR' not in result:
-            result += upload_tcg()
+            result += upload_tcg('output.csv')
         self.progress_percent['text']='100%'
         self.progress['value']=100
         self.response.set(result)
