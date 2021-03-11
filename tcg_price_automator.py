@@ -179,7 +179,7 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
                 print(f'Determining real-est price for card: {card.number}')
                 # Using Selenium to select dynamic content
                 chrome_options = Options()
-                #chrome_options.add_argument('--headless')
+                chrome_options.add_argument('--headless')
                 driver = webdriver.Chrome(options=chrome_options)
                 driver.get(url)
                 unique_url = None
