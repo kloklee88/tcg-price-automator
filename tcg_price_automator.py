@@ -314,7 +314,7 @@ class Window(Frame):
         self.filepath = StringVar(value='inventory-new.csv')
         self.response = StringVar()
         self.determine_price = IntVar(value=1)
-        self.upload_tcg = IntVar(value=1)
+        self.upload_tcg = IntVar(value=0)
         self.use_new_records = IntVar(value=0)
 
         self.choose_file_frame = ttk.Frame(self.content)
