@@ -191,7 +191,7 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
                     )
                     item_num = len(driver.find_elements_by_class_name('search-result__product'))
                     print(f'Number of items on search page: {item_num}')
-                if item_num > 1 or not card.unique_link:
+                if item_num > 1 and not card.unique_link:
                     real_price = 0
                     notes = 'Multiple links when searching. Requires user selection'
                 else:
