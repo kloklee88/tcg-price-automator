@@ -8,6 +8,7 @@ import sys
 import webbrowser
 import threading
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -170,23 +171,25 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
                 url = None
                 notes = None
                 if not card.unique_link:
-                    url = 'https://shop.tcgplayer.com/yugioh/product/show?advancedSearch=true&Number=' + card.number
+                    url = 'https://www.tcgplayer.com/search/yugioh/product?Number=' + card.number
                 else:
                     url = card.unique_link
                 print(f'URL searched: {url}')
                 # Scrape TCG Player site first page listing to determine real-est price
                 print(f'Determining real-est price for card: {card.number}')
                 # Using Selenium to select dynamic content
-                driver = webdriver.Chrome()
+                chrome_options = Options()
+                #chrome_options.add_argument('--headless')
+                driver = webdriver.Chrome(options=chrome_options)
                 driver.get(url)
                 unique_url = None
                 updated_card_name = None
                 item_num = 0
                 if not card.unique_link:
                     WebDriverWait(driver, 10).until(
-                        EC.presence_of_element_located((By.CLASS_NAME, 'product__image'))
+                        EC.presence_of_element_located((By.CLASS_NAME, 'search-result__product'))
                     )
-                    item_num = len(driver.find_elements_by_class_name('product__image'))
+                    item_num = len(driver.find_elements_by_class_name('search-result__product'))
                     print(f'Number of items on search page: {item_num}')
                 if item_num > 1 or not card.unique_link:
                     real_price = 0
@@ -194,7 +197,7 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
                 else:
                     # Click on first element of search results, assuming that there is only ONE item in list
                     if not card.unique_link:
-                        driver.find_elements_by_class_name('product__image')[0].click()
+                        driver.find_elements_by_class_name('search-result__product')[0].click()
                     unique_url = driver.current_url
                     if not card.name:
                         WebDriverWait(driver, 10).until(
