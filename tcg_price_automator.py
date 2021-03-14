@@ -304,12 +304,12 @@ class Window(Frame):
         self.content = ttk.Frame(self, padding=(5,5,5,5))
         self.content.pack(fill=BOTH, expand=1)
 
-        pic = Image.open("background_dragon.png")
-        pic = pic.resize((400,350), Image.ANTIALIAS)
-        bg_image = ImageTk.PhotoImage(pic)
-        background_label = ttk.Label(self.content, image=bg_image)
-        background_label.place(x=0,y=0, relwidth=1, relheight=1)
-        background_label.image = bg_image
+        #pic = Image.open("background_dragon.png")
+        #pic = pic.resize((400,350), Image.ANTIALIAS)
+        #bg_image = ImageTk.PhotoImage(pic)
+        #background_label = ttk.Label(self.content, image=bg_image)
+        #background_label.place(x=0,y=0, relwidth=1, relheight=1)
+        #background_label.image = bg_image
 
         self.filepath = StringVar(value='inventory-new.csv')
         self.response = StringVar()
@@ -338,7 +338,7 @@ class Window(Frame):
         ttk.Label(self.content, textvariable=self.response).place(relx=0.5, rely=0.7, anchor=CENTER)
 
         ttk.Button(self.content, text='Run',command=self.process, width=15).place(relx=0.5, rely=0.85, anchor=CENTER)
-        ttk.Button(self.content, text='Exit',command=self.client_exit, width=15).place(relx=0.5, rely=0.95, anchor=CENTER)
+        #tk.Button(self.content, text='Exit',command=self.client_exit, width=15).place(relx=0.5, rely=0.95, anchor=CENTER)
     
     def choose_file(self):
         filename = filedialog.askopenfilename(filetypes = (("CSV", "*.csv"), ("All files", "*")))
@@ -372,7 +372,7 @@ class Window(Frame):
 root = Tk()
 root.geometry("400x350")
 root.style = ThemedStyle()
-#print(f'Available themes: {root.style.theme_names()}')
-root.style.theme_use("itft1")
+print(f'Available themes: {root.style.theme_names()}')
+root.style.theme_use("scidblue")
 app = Window(root)
 root.mainloop()
