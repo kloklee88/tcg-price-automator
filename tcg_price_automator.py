@@ -19,7 +19,10 @@ from tkinter import ttk, filedialog
 from ttkthemes import ThemedTk, ThemedStyle
 from PIL import Image, ImageTk
 import getpass
+import logging
 
+logging.basicConfig(level=logging.INFO, filename="logfile", filemode="a+",
+                        format="%(asctime)-15s %(levelname)-8s %(message)s")
 
 class Card:
     def __init__(self, name, number, edition, condition, quantity, current_price, real_price, money_change, percent_change, link_option, unique_link, notes):
@@ -39,7 +42,7 @@ class Card:
 
 def read_csv(filepath):
     # Read records into CSV
-    print(f'Reading CSV from {filepath}')
+    logging.info(f'Reading CSV from {filepath}')
     records = []
     with open(filepath, newline='') as csvfile:
         reader = csv.reader(csvfile)
@@ -67,7 +70,7 @@ def determine_real_price(driver, name, condition, edition):
         EC.presence_of_element_located((By.CLASS_NAME, 'product-listing'))
     )
     product_listings = driver.find_elements_by_class_name('product-listing')
-    #print(product_listings)
+    #logging.info(product_listings)
     running_price = 0
     running_quantity = 0
     running_price_1st = 0
@@ -90,10 +93,10 @@ def determine_real_price(driver, name, condition, edition):
         total_price = price + shipping
         quantity = int(product.find_element_by_id(
             'quantityAvailable').get_attribute('value'))
-        # print(price)
-        # print(shipping)
-        # print(total_price)
-        # print(quantity)
+        # logging.info(price)
+        # logging.info(shipping)
+        # logging.info(total_price)
+        # logging.info(quantity)
         running_price += total_price*quantity
         running_quantity += quantity
         if '1st Edition' in condition_edition:
@@ -102,20 +105,20 @@ def determine_real_price(driver, name, condition, edition):
         elif 'Unlimited' in condition_edition:
             running_price_unlimited += total_price*quantity
             running_quantity_unlimited += quantity
-    print(f'Normal -> Price={running_price}, quantity={running_quantity}')
-    print(f'1st -> Price={running_price_1st}, quantity={running_quantity_1st}')
-    print(f'Unlimited -> Price={running_price_unlimited}, quantity={running_quantity_unlimited}')
+    logging.info(f'Normal -> Price={running_price}, quantity={running_quantity}')
+    logging.info(f'1st -> Price={running_price_1st}, quantity={running_quantity_1st}')
+    logging.info(f'Unlimited -> Price={running_price_unlimited}, quantity={running_quantity_unlimited}')
     # If total quantity between all sellers is below 15, stop processing
     if running_quantity < 12:
         return -12
     real_price = round(running_price/running_quantity, 2)
     if running_quantity_1st != 0:
         real_price_1st = round(running_price_1st/running_quantity_1st, 2)
-        print(f'Real Price 1st: {real_price_1st}')
+        logging.info(f'Real Price 1st: {real_price_1st}')
     if running_quantity_unlimited != 0:
         real_price_unlimited = round(running_price_unlimited/running_quantity_unlimited, 2)
-        print(f'Real Price Unlimited: {real_price_unlimited}')
-    print(f'Real Price: {real_price}')
+        logging.info(f'Real Price Unlimited: {real_price_unlimited}')
+    logging.info(f'Real Price: {real_price}')
     return real_price
 
 
@@ -152,7 +155,7 @@ def determine_percent_change(original, new):
     return round((new-original)/original, 2)
 
 def automate_price(filepath, use_new_records, progress_bar, progress_percent):
-    print('Starting price automation script')
+    logging.info('Starting price automation script')
     start_time = datetime.now()
     progress_value = 0
     try:
@@ -163,9 +166,9 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
             progress_value = i/len(inventory)*100
             progress_bar['value'] = progress_value
             progress_percent['text'] = f'{round(progress_value,2)}%'
-            print(f'Progress value: {progress_value}')
+            logging.info(f'Progress value: {progress_value}')
             # Only process if use_new_records is false OR if new record and the card name is empty
-            print(f'Only using new records: {use_new_records}')
+            logging.info(f'Only using new records: {use_new_records}')
             if (use_new_records and not card.name) or not use_new_records:
                 # Use either the unique URL from CSV or construct it for first time
                 url = None
@@ -174,9 +177,9 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
                     url = 'https://www.tcgplayer.com/search/yugioh/product?Number=' + card.number
                 else:
                     url = card.unique_link
-                print(f'URL searched: {url}')
+                logging.info(f'URL searched: {url}')
                 # Scrape TCG Player site first page listing to determine real-est price
-                print(f'Determining real-est price for card: {card.number}')
+                logging.info(f'Determining real-est price for card: {card.number}')
                 # Using Selenium to select dynamic content
                 chrome_options = Options()
                 chrome_options.add_argument('--headless')
@@ -190,7 +193,7 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
                         EC.presence_of_element_located((By.CLASS_NAME, 'search-result__product'))
                     )
                     item_num = len(driver.find_elements_by_class_name('search-result__product'))
-                    print(f'Number of items on search page: {item_num}')
+                    logging.info(f'Number of items on search page: {item_num}')
                 if item_num > 1 and not card.unique_link:
                     real_price = 0
                     notes = 'Multiple links when searching. Requires user selection'
@@ -204,17 +207,17 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
                             EC.presence_of_element_located((By.CLASS_NAME, 'product-details__name'))
                         )
                         updated_card_name = driver.find_elements_by_class_name('product-details__name')[1].text
-                        #print(driver.find_elements_by_class_name('product-details__name')[0])
-                        print(f'Getting card name: {updated_card_name}')
+                        #logging.info(driver.find_elements_by_class_name('product-details__name')[0])
+                        logging.info(f'Getting card name: {updated_card_name}')
                         card.name = updated_card_name
                     if not card.condition:
-                        print(f'Filling in Near Mint')
+                        logging.info(f'Filling in Near Mint')
                         card.condition = 'Near Mint'
                     if not card.edition:
-                        print(f'Filling in 1st Edition')
+                        logging.info(f'Filling in 1st Edition')
                         card.edition = '1st Edition'
                     real_price = determine_real_price(driver, card.name, card.condition, card.edition)
-                print(f'Unique URL: {unique_url}')
+                logging.info(f'Unique URL: {unique_url}')
                 if real_price == -12:
                     real_price = 0
                     notes = 'Total quantity less than 12'
@@ -237,22 +240,20 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
                                     card.condition, card.quantity, card.current_price, real_price, money_change, percent_change, url, unique_url, notes))
             message = 'Inventory prices have been updated!\n'
     except Exception as e:
-        print("ERROR! did not complete scraping")
-        print(e)
+        logging.exception("ERROR! did not complete scraping")
         message = 'ERROR! Did not fully complete determining price\n'
-        traceback.print_exc()
     finally:
         completion_time = datetime.now() - start_time
-        print(f'Time to complete (seconds): {completion_time.seconds}')
+        logging.info(f'Time to complete (seconds): {completion_time.seconds}')
         write_csv('output.csv', listing)
         if driver:
             driver.quit()
         progress_value = 100
-        print('Finished price automation script')
+        logging.info('Finished price automation script')
         return message
 
 def upload_tcg(filepath):
-    print('Starting uploading to TCG Player')
+    logging.info('Starting uploading to TCG Player')
     start_time = datetime.now()
     url = 'https://store.tcgplayer.com/login?returnUrl=www.tcgplayer.com/'
     driver = webdriver.Chrome()
@@ -271,18 +272,16 @@ def upload_tcg(filepath):
         listing = []
         inventory = read_csv(filepath)
         #for i,card in enumerate(inventory):
-        #    print('TEST')
+        #    logging.info('TEST')
         message = 'Listings have been uploaded to TCG!'
     except Exception as e:
-        print("ERROR! did not complete upload")
-        print(e)
+        logging.exception("ERROR! did not complete upload")
         message = 'ERROR! Did not fully complete uploading to TCG\n'
-        traceback.print_exc()
     finally:
         completion_time = datetime.now() - start_time
-        print(f'Time to complete upload (seconds): {completion_time.seconds}')
+        logging.info(f'Time to complete upload (seconds): {completion_time.seconds}')
         #progress_value = 100
-        print('Finished upload automation script')
+        logging.info('Finished upload automation script')
         return message
 
 
@@ -342,7 +341,7 @@ class Window(Frame):
     
     def choose_file(self):
         filename = filedialog.askopenfilename(filetypes = (("CSV", "*.csv"), ("All files", "*")))
-        print(filename)
+        logging.info(filename)
         self.choose_file_entry.delete(0, END)
         self.choose_file_entry.insert(0, filename)
 
@@ -353,7 +352,7 @@ class Window(Frame):
         result = ''
         self.response.set(result)
         if not self.choose_file_entry.get():
-            print('Inventory entry is empty')
+            logging.info('Inventory entry is empty')
             self.response.set('Inventory CSV is empty! Please choose a file!!')
             return
         if self.determine_price.get(): 
@@ -372,7 +371,7 @@ class Window(Frame):
 root = Tk()
 root.geometry("400x350")
 root.style = ThemedStyle()
-print(f'Available themes: {root.style.theme_names()}')
+logging.info(f'Available themes: {root.style.theme_names()}')
 root.style.theme_use("scidblue")
 app = Window(root)
 root.mainloop()
