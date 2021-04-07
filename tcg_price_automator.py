@@ -169,7 +169,7 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
             logging.info(f'Progress value: {progress_value}')
             # Only process if use_new_records is false OR if new record and the card name is empty
             logging.info(f'Only using new records: {use_new_records}')
-            if (use_new_records and not card.name) or not use_new_records:
+            if (use_new_records and not card.unique_link) or not use_new_records:
                 # Use either the unique URL from CSV or construct it for first time
                 url = None
                 notes = None
@@ -238,6 +238,9 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
                         float(card.current_price), real_price)
                 listing.append(Card(card.name, card.number, card.edition,
                                     card.condition, card.quantity, card.current_price, real_price, money_change, percent_change, url, unique_url, notes))
+            else:
+                #Add existing record into new file, do not change
+                listing.append(card)
             message = 'Inventory prices have been updated!\n'
     except Exception as e:
         logging.exception("ERROR! did not complete scraping")
