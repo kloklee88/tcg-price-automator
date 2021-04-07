@@ -21,7 +21,7 @@ from PIL import Image, ImageTk
 import getpass
 import logging
 
-logging.basicConfig(level=logging.INFO, filename="logfile", filemode="a+",
+logging.basicConfig(level=logging.INFO, filename="logfile.txt", filemode="a+",
                         format="%(asctime)-15s %(levelname)-8s %(message)s")
 
 class Card:
