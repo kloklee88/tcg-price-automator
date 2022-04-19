@@ -1,24 +1,19 @@
 # tcg_price_automor.py - Gets the "real-est" price for inventory of TCG cards and lists them appropriately
 
-import time
 import csv
-import traceback
 import requests
-import sys
-import webbrowser
 import threading
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import SessionNotCreatedException
 from datetime import datetime
-from datetime import timedelta
 from tkinter import *
 from tkinter import ttk, filedialog
 from ttkthemes import ThemedTk, ThemedStyle
 from PIL import Image, ImageTk
-import getpass
 import logging
 
 logging.basicConfig(level=logging.INFO, filename="logfile.txt", filemode="a+",
@@ -159,6 +154,7 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
     start_time = datetime.now()
     progress_value = 0
     try:
+        driver = None
         listing = []
         inventory = read_csv(filepath)
         for i,card in enumerate(inventory):
@@ -206,7 +202,8 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
                         WebDriverWait(driver, 10).until(
                             EC.presence_of_element_located((By.CLASS_NAME, 'product-details__name'))
                         )
-                        updated_card_name = driver.find_elements_by_class_name('product-details__name')[1].text
+                        if len(driver.find_elements_by_class_name('product-details__name')) > 1:
+                            updated_card_name = driver.find_elements_by_class_name('product-details__name')[1].text
                         #logging.info(driver.find_elements_by_class_name('product-details__name')[0])
                         logging.info(f'Getting card name: {updated_card_name}')
                         card.name = updated_card_name
@@ -242,6 +239,9 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
                 #Add existing record into new file, do not change
                 listing.append(card)
             message = 'Inventory prices have been updated!\n'
+    except SessionNotCreatedException as se:
+        logging.exception("ERROR! Chrome driver version does not match browser version")
+        message = 'ERROR! Chrome driver version does not match browser version.\nPlease download and use the correct drivers.\n'
     except Exception as e:
         logging.exception("ERROR! did not complete scraping")
         message = 'ERROR! Did not fully complete determining price\n'
@@ -254,39 +254,6 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
         progress_value = 100
         logging.info('Finished price automation script')
         return message
-
-def upload_tcg(filepath):
-    logging.info('Starting uploading to TCG Player')
-    start_time = datetime.now()
-    url = 'https://store.tcgplayer.com/login?returnUrl=www.tcgplayer.com/'
-    driver = webdriver.Chrome()
-    driver.get(url)
-    # Sign in
-    #email = driver.find_elements_by_id('Email')
-    #password = driver.find_elements_by_id('Password')
-    #email.send_keys('username') 
-    #password.send_keys('password')
-    # Make selenium user pause here
-    WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.ID, 'Email'))
-    )
-    WebDriverWait(driver, 10).until(lambda driver: driver.find_elements_by_class_name('test'))
-    try:
-        listing = []
-        inventory = read_csv(filepath)
-        #for i,card in enumerate(inventory):
-        #    logging.info('TEST')
-        message = 'Listings have been uploaded to TCG!'
-    except Exception as e:
-        logging.exception("ERROR! did not complete upload")
-        message = 'ERROR! Did not fully complete uploading to TCG\n'
-    finally:
-        completion_time = datetime.now() - start_time
-        logging.info(f'Time to complete upload (seconds): {completion_time.seconds}')
-        #progress_value = 100
-        logging.info('Finished upload automation script')
-        return message
-
 
 ###################
 # GUI 
@@ -306,17 +273,16 @@ class Window(Frame):
         self.content = ttk.Frame(self, padding=(5,5,5,5))
         self.content.pack(fill=BOTH, expand=1)
 
-        #pic = Image.open("background_dragon.png")
-        #pic = pic.resize((400,350), Image.ANTIALIAS)
-        #bg_image = ImageTk.PhotoImage(pic)
-        #background_label = ttk.Label(self.content, image=bg_image)
-        #background_label.place(x=0,y=0, relwidth=1, relheight=1)
-        #background_label.image = bg_image
+        pic = Image.open("background_dragon.png")
+        pic = pic.resize((400,350), Image.ANTIALIAS)
+        bg_image = ImageTk.PhotoImage(pic)
+        background_label = ttk.Label(self.content, image=bg_image)
+        background_label.place(x=0,y=0, relwidth=1, relheight=1)
+        background_label.image = bg_image
 
         self.filepath = StringVar(value='inventory-new.csv')
         self.response = StringVar()
         self.determine_price = IntVar(value=1)
-        self.upload_tcg = IntVar(value=0)
         self.use_new_records = IntVar(value=0)
 
         self.choose_file_frame = ttk.Frame(self.content)
@@ -329,8 +295,7 @@ class Window(Frame):
         self.labelframe = ttk.LabelFrame(self.content, text='Options')
         self.labelframe.place(relx=0.5, rely=0.3, anchor=CENTER)
         ttk.Checkbutton(self.labelframe, text='Determine Price', variable=self.determine_price).grid(row=1,column=0,sticky=W)
-        ttk.Checkbutton(self.labelframe, text='Upload to TCG', variable=self.upload_tcg).grid(row=2,column=0,sticky=W)
-        ttk.Checkbutton(self.labelframe, text='Use only new records', variable=self.use_new_records).grid(row=3,column=0,sticky=W)
+        ttk.Checkbutton(self.labelframe, text='Use only new records', variable=self.use_new_records).grid(row=2,column=0,sticky=W)
         
         self.progress = ttk.Progressbar(self.content, length=350, mode='determinate')
         self.progress.place(relx=0.5, rely=0.5, anchor=CENTER)
@@ -360,8 +325,6 @@ class Window(Frame):
             return
         if self.determine_price.get(): 
             result += automate_price(self.choose_file_entry.get(), self.use_new_records.get(), self.progress, self.progress_percent) # Pass CSV filepath
-        if self.upload_tcg.get() and 'ERROR' not in result:
-            result += upload_tcg('output.csv')
         self.progress_percent['text']='100%'
         self.progress['value']=100
         self.response.set(result)
