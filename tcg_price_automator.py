@@ -3,6 +3,7 @@
 import csv
 import requests
 import threading
+import webbrowser
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -17,7 +18,8 @@ from PIL import Image, ImageTk
 import logging
 
 logging.basicConfig(level=logging.INFO, filename="logfile.txt", filemode="a+",
-                        format="%(asctime)-15s %(levelname)-8s %(message)s")
+                    format="%(asctime)-15s %(levelname)-8s %(message)s")
+
 
 class Card:
     def __init__(self, name, number, edition, condition, quantity, current_price, real_price, money_change, percent_change, link_option, unique_link, notes):
@@ -65,7 +67,7 @@ def determine_real_price(driver, name, condition, edition):
         EC.presence_of_element_located((By.CLASS_NAME, 'product-listing'))
     )
     product_listings = driver.find_elements_by_class_name('product-listing')
-    #logging.info(product_listings)
+    # logging.info(product_listings)
     running_price = 0
     running_quantity = 0
     running_price_1st = 0
@@ -79,8 +81,8 @@ def determine_real_price(driver, name, condition, edition):
         condition_edition = product.find_element_by_class_name(
             'product-listing__condition').text
         edition_parsed = filter_by_edition(condition_edition)
-        #if edition_parsed == edition:
-            # TODO: finish filtering by edition
+        # if edition_parsed == edition:
+        # TODO: finish filtering by edition
         price = float(product.find_element_by_class_name(
             'product-listing__price').text.replace('$', ''))
         shipping = float(product.find_element_by_class_name('product-listing__shipping').text.replace(
@@ -100,9 +102,12 @@ def determine_real_price(driver, name, condition, edition):
         elif 'Unlimited' in condition_edition:
             running_price_unlimited += total_price*quantity
             running_quantity_unlimited += quantity
-    logging.info(f'Normal -> Price={running_price}, quantity={running_quantity}')
-    logging.info(f'1st -> Price={running_price_1st}, quantity={running_quantity_1st}')
-    logging.info(f'Unlimited -> Price={running_price_unlimited}, quantity={running_quantity_unlimited}')
+    logging.info(
+        f'Normal -> Price={running_price}, quantity={running_quantity}')
+    logging.info(
+        f'1st -> Price={running_price_1st}, quantity={running_quantity_1st}')
+    logging.info(
+        f'Unlimited -> Price={running_price_unlimited}, quantity={running_quantity_unlimited}')
     # If total quantity between all sellers is below 15, stop processing
     if running_quantity < 12:
         return -12
@@ -111,7 +116,8 @@ def determine_real_price(driver, name, condition, edition):
         real_price_1st = round(running_price_1st/running_quantity_1st, 2)
         logging.info(f'Real Price 1st: {real_price_1st}')
     if running_quantity_unlimited != 0:
-        real_price_unlimited = round(running_price_unlimited/running_quantity_unlimited, 2)
+        real_price_unlimited = round(
+            running_price_unlimited/running_quantity_unlimited, 2)
         logging.info(f'Real Price Unlimited: {real_price_unlimited}')
     logging.info(f'Real Price: {real_price}')
     return real_price
@@ -149,6 +155,43 @@ def determine_money_change(original, new):
 def determine_percent_change(original, new):
     return round((new-original)/original, 2)
 
+
+def get_card_page(card, driver):
+    # Use either the unique URL from CSV or construct it for first time
+    url = None
+    if not card.unique_link:
+        url = 'https://www.tcgplayer.com/search/yugioh/product?Number=' + card.number
+    else:
+        url = card.unique_link
+    logging.info(f'URL searched: {url}')
+    # Scrape TCG Player site first page listing to determine real-est price
+    logging.info(f'Determining real-est price for card: {card.number}')
+    # Using Selenium to select dynamic content
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')
+    driver = webdriver.Chrome(options=chrome_options)
+    driver.get(url)
+    unique_url = None
+    item_num = 0
+    if not card.unique_link:
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located(
+                (By.CLASS_NAME, 'search-result__product'))
+        )
+        item_num = len(driver.find_elements_by_class_name(
+            'search-result__product'))
+        logging.info(f'Number of items on search page: {item_num}')
+    if item_num > 1 and not card.unique_link:
+        unique_url = None
+    else:
+        # Click on first element of search results, assuming that there is only ONE item in list
+        if not card.unique_link:
+            driver.find_elements_by_class_name(
+                'search-result__product')[0].click()
+        unique_url = driver.current_url
+    return unique_url
+
+
 def automate_price(filepath, use_new_records, progress_bar, progress_percent):
     logging.info('Starting price automation script')
     start_time = datetime.now()
@@ -157,7 +200,7 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
         driver = None
         listing = []
         inventory = read_csv(filepath)
-        for i,card in enumerate(inventory):
+        for i, card in enumerate(inventory):
             # Keep track of progress bar
             progress_value = i/len(inventory)*100
             progress_bar['value'] = progress_value
@@ -166,54 +209,40 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
             # Only process if use_new_records is false OR if new record and the card name is empty
             logging.info(f'Only using new records: {use_new_records}')
             if (use_new_records and not card.unique_link) or not use_new_records:
-                # Use either the unique URL from CSV or construct it for first time
-                url = None
-                notes = None
-                if not card.unique_link:
-                    url = 'https://www.tcgplayer.com/search/yugioh/product?Number=' + card.number
-                else:
-                    url = card.unique_link
-                logging.info(f'URL searched: {url}')
-                # Scrape TCG Player site first page listing to determine real-est price
-                logging.info(f'Determining real-est price for card: {card.number}')
                 # Using Selenium to select dynamic content
                 chrome_options = Options()
                 chrome_options.add_argument('--headless')
                 driver = webdriver.Chrome(options=chrome_options)
-                driver.get(url)
-                unique_url = None
-                updated_card_name = None
-                item_num = 0
-                if not card.unique_link:
-                    WebDriverWait(driver, 10).until(
-                        EC.presence_of_element_located((By.CLASS_NAME, 'search-result__product'))
-                    )
-                    item_num = len(driver.find_elements_by_class_name('search-result__product'))
-                    logging.info(f'Number of items on search page: {item_num}')
-                if item_num > 1 and not card.unique_link:
+                unique_url = get_card_page(card, driver)
+                url = None  # temporary
+                if unique_url is None:
                     real_price = 0
                     notes = 'Multiple links when searching. Requires user selection'
-                else:
-                    # Click on first element of search results, assuming that there is only ONE item in list
-                    if not card.unique_link:
-                        driver.find_elements_by_class_name('search-result__product')[0].click()
-                    unique_url = driver.current_url
-                    if not card.name:
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.CLASS_NAME, 'product-details__name'))
-                        )
-                        if len(driver.find_elements_by_class_name('product-details__name')) > 1:
-                            updated_card_name = driver.find_elements_by_class_name('product-details__name')[1].text
-                        #logging.info(driver.find_elements_by_class_name('product-details__name')[0])
-                        logging.info(f'Getting card name: {updated_card_name}')
-                        card.name = updated_card_name
-                    if not card.condition:
-                        logging.info(f'Filling in Near Mint')
-                        card.condition = 'Near Mint'
-                    if not card.edition:
-                        logging.info(f'Filling in 1st Edition')
-                        card.edition = '1st Edition'
-                    real_price = determine_real_price(driver, card.name, card.condition, card.edition)
+                    listing.append(Card(card.name, card.number, card.edition,
+                                        card.condition, card.quantity, card.current_price, real_price, money_change, percent_change, url, unique_url, notes))
+                    break
+                driver.get(unique_url)
+                notes = None
+                updated_card_name = None
+                if not card.name:
+                    WebDriverWait(driver, 10).until(
+                        EC.presence_of_element_located(
+                            (By.CLASS_NAME, 'product-details__name'))
+                    )
+                    if len(driver.find_elements_by_class_name('product-details__name')) > 1:
+                        updated_card_name = driver.find_elements_by_class_name(
+                            'product-details__name')[1].text
+                    # logging.info(driver.find_elements_by_class_name('product-details__name')[0])
+                    logging.info(f'Getting card name: {updated_card_name}')
+                    card.name = updated_card_name
+                if not card.condition:
+                    logging.info(f'Filling in Near Mint')
+                    card.condition = 'Near Mint'
+                if not card.edition:
+                    logging.info(f'Filling in 1st Edition')
+                    card.edition = '1st Edition'
+                real_price = determine_real_price(
+                    driver, card.name, card.condition, card.edition)
                 logging.info(f'Unique URL: {unique_url}')
                 if real_price == -12:
                     real_price = 0
@@ -236,11 +265,12 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
                 listing.append(Card(card.name, card.number, card.edition,
                                     card.condition, card.quantity, card.current_price, real_price, money_change, percent_change, url, unique_url, notes))
             else:
-                #Add existing record into new file, do not change
+                # Add existing record into new file, do not change
                 listing.append(card)
-            message = 'Inventory prices have been updated!\n'
+        message = 'Inventory prices have been updated!\n'
     except SessionNotCreatedException as se:
-        logging.exception("ERROR! Chrome driver version does not match browser version")
+        logging.exception(
+            "ERROR! Chrome driver version does not match browser version")
         message = 'ERROR! Chrome driver version does not match browser version.\nPlease download and use the correct drivers.\n'
     except Exception as e:
         logging.exception("ERROR! did not complete scraping")
@@ -256,28 +286,30 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
         return message
 
 ###################
-# GUI 
+# GUI
 ###################
+
+
 class Window(Frame):
     def __init__(self, master=None):
-        ttk.Frame.__init__(self, master)         
+        ttk.Frame.__init__(self, master)
         self.master = master
         self.init_window()
 
     def init_window(self, side=LEFT, anchor=W):
         self.master.title('TCG Price Automator')
-        photo = PhotoImage(file ='upstart_goblin.png')
+        photo = PhotoImage(file='upstart_goblin.png')
         self.master.iconphoto(False, photo)
         self.pack(fill=BOTH, expand=1)
 
-        self.content = ttk.Frame(self, padding=(5,5,5,5))
+        self.content = ttk.Frame(self, padding=(5, 5, 5, 5))
         self.content.pack(fill=BOTH, expand=1)
 
         pic = Image.open("background_dragon.png")
-        pic = pic.resize((400,350), Image.ANTIALIAS)
+        pic = pic.resize((500, 450), Image.ANTIALIAS)
         bg_image = ImageTk.PhotoImage(pic)
         background_label = ttk.Label(self.content, image=bg_image)
-        background_label.place(x=0,y=0, relwidth=1, relheight=1)
+        background_label.place(x=0, y=0, relwidth=1, relheight=1)
         background_label.image = bg_image
 
         self.filepath = StringVar(value='inventory-new.csv')
@@ -287,34 +319,52 @@ class Window(Frame):
 
         self.choose_file_frame = ttk.Frame(self.content)
         self.choose_file_frame.place(relx=0.5, rely=0.1, anchor=CENTER)
-        self.choose_file_entry = ttk.Entry(self.choose_file_frame, textvariable=self.filepath, width=30)
-        self.choose_file_entry.grid(row=0,column=0,sticky=W)
-        ttk.Button(self.choose_file_frame, text='Choose CSV File', command=self.choose_file).grid(row=0,column=1,sticky=W)
+        self.choose_file_entry = ttk.Entry(
+            self.choose_file_frame, textvariable=self.filepath, width=30)
+        self.choose_file_entry.grid(row=0, column=0, sticky=W)
+        ttk.Button(self.choose_file_frame, text='Choose CSV File',
+                   command=self.choose_file).grid(row=0, column=1, sticky=W)
 
-        ttk.Label(self.content, text='').grid(row=1,column=0,sticky=W)
+        ttk.Label(self.content, text='').grid(row=1, column=0, sticky=W)
         self.labelframe = ttk.LabelFrame(self.content, text='Options')
         self.labelframe.place(relx=0.5, rely=0.3, anchor=CENTER)
-        ttk.Checkbutton(self.labelframe, text='Determine Price', variable=self.determine_price).grid(row=1,column=0,sticky=W)
-        ttk.Checkbutton(self.labelframe, text='Use only new records', variable=self.use_new_records).grid(row=2,column=0,sticky=W)
-        
-        self.progress = ttk.Progressbar(self.content, length=350, mode='determinate')
+        ttk.Checkbutton(self.labelframe, text='Determine Price',
+                        variable=self.determine_price).grid(row=1, column=0, sticky=W)
+        ttk.Checkbutton(self.labelframe, text='Use only new records',
+                        variable=self.use_new_records).grid(row=2, column=0, sticky=W)
+
+        self.progress = ttk.Progressbar(
+            self.content, length=400, mode='determinate')
         self.progress.place(relx=0.5, rely=0.5, anchor=CENTER)
         self.progress_percent = ttk.Label(self.content, text='')
         self.progress_percent.place(relx=0.5, rely=0.575, anchor=CENTER)
 
-        ttk.Label(self.content, textvariable=self.response).place(relx=0.5, rely=0.7, anchor=CENTER)
+        ttk.Label(self.content, textvariable=self.response).place(
+            relx=0.5, rely=0.7, anchor=CENTER)
 
-        ttk.Button(self.content, text='Run',command=self.process, width=15).place(relx=0.5, rely=0.85, anchor=CENTER)
-        #tk.Button(self.content, text='Exit',command=self.client_exit, width=15).place(relx=0.5, rely=0.95, anchor=CENTER)
-    
+        ttk.Button(self.content, text='Check chrome version', command=self.check_chrome_version,
+                   width=20).place(relx=0.5, rely=0.8, anchor=CENTER)
+        ttk.Button(self.content, text='Download driver', command=self.download_driver,
+                   width=20).place(relx=0.5, rely=0.875, anchor=CENTER)
+        ttk.Button(self.content, text='Run', command=self.process,
+                   width=15).place(relx=0.5, rely=0.95, anchor=CENTER)
+        # tk.Button(self.content, text='Exit',command=self.client_exit, width=15).place(relx=0.5, rely=0.95, anchor=CENTER)
+
     def choose_file(self):
-        filename = filedialog.askopenfilename(filetypes = (("CSV", "*.csv"), ("All files", "*")))
+        filename = filedialog.askopenfilename(
+            filetypes=(("CSV", "*.csv"), ("All files", "*")))
         logging.info(filename)
         self.choose_file_entry.delete(0, END)
         self.choose_file_entry.insert(0, filename)
 
     def client_exit(self):
         exit()
+
+    def check_chrome_version(self):
+        webbrowser.open_new_tab("https://www.whatismybrowser.com/detect/what-version-of-chrome-do-i-have")
+
+    def download_driver(self):
+        webbrowser.open_new_tab("https://chromedriver.chromium.org/downloads")
 
     def run(self):
         result = ''
@@ -323,19 +373,20 @@ class Window(Frame):
             logging.info('Inventory entry is empty')
             self.response.set('Inventory CSV is empty! Please choose a file!!')
             return
-        if self.determine_price.get(): 
-            result += automate_price(self.choose_file_entry.get(), self.use_new_records.get(), self.progress, self.progress_percent) # Pass CSV filepath
-        self.progress_percent['text']='100%'
-        self.progress['value']=100
+        if self.determine_price.get():
+            result += automate_price(self.choose_file_entry.get(), self.use_new_records.get(
+            ), self.progress, self.progress_percent)  # Pass CSV filepath
+        self.progress_percent['text'] = '100%'
+        self.progress['value'] = 100
         self.response.set(result)
 
     def process(self):
         control_thread = threading.Thread(target=self.run, daemon=True)
         control_thread.start()
-        
+
 
 root = Tk()
-root.geometry("400x350")
+root.geometry("500x450")
 root.style = ThemedStyle()
 logging.info(f'Available themes: {root.style.theme_names()}')
 root.style.theme_use("scidblue")
