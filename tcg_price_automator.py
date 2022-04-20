@@ -215,9 +215,11 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
                 chrome_options.add_argument('--headless')
                 driver = webdriver.Chrome(options=chrome_options)
                 unique_url = get_card_page(card, driver)
-                url = None  # temporary
+                url = None
+                money_change = 0
+                percent_change = 0
+                real_price = 0
                 if unique_url is None:
-                    real_price = 0
                     notes = 'Multiple links when searching. Requires user selection'
                     listing.append(Card(card.name, card.number, card.edition,
                                         card.condition, card.quantity, card.current_price, real_price, money_change, percent_change, url, unique_url, notes))
@@ -256,8 +258,6 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
                     notes = 'Price floor was applied for this card'
                 driver.close()
                 # Positive value means price increased, negative means price decreased. Only output if current price exist
-                money_change = 0
-                percent_change = 0
                 if card.current_price:
                     money_change = determine_money_change(
                         float(card.current_price), real_price)
