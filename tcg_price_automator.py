@@ -1,6 +1,7 @@
 # tcg_price_automor.py - Gets the "real-est" price for inventory of TCG cards and lists them appropriately
 
 import csv
+from shutil import ReadError
 import requests
 import threading
 import webbrowser
@@ -41,12 +42,15 @@ def read_csv(filepath):
     # Read records into CSV
     logging.info(f'Reading CSV from {filepath}')
     records = []
-    with open(filepath, newline='') as csvfile:
-        reader = csv.reader(csvfile)
-        next(reader, None)  # Skips the header
-        for row in reader:
-            records.append(Card(row[0], row[1], row[2],
-                                row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11]))
+    try:
+        with open(filepath, newline='') as csvfile:
+            reader = csv.reader(csvfile)
+            next(reader, None)  # Skips the header
+            for row in reader:
+                records.append(Card(row[0], row[1], row[2],
+                                    row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11]))
+    except Exception:
+        raise IOError
     return records
 
 
@@ -269,6 +273,9 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
                 # Add existing record into new file, do not change
                 listing.append(card)
         message = 'Inventory prices have been updated!\n'
+    except IOError:
+        logging.exception("ERROR! CSV file could not be retrieved or read")
+        message = 'ERROR! CSV file could not be retrieved or read\n'
     except SessionNotCreatedException as se:
         logging.exception(
             "ERROR! Chrome driver version does not match browser version")
