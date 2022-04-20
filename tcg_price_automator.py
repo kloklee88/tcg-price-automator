@@ -197,6 +197,7 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
     start_time = datetime.now()
     progress_value = 0
     try:
+        message = ''
         driver = None
         listing = []
         inventory = read_csv(filepath)
@@ -271,7 +272,7 @@ def automate_price(filepath, use_new_records, progress_bar, progress_percent):
     except SessionNotCreatedException as se:
         logging.exception(
             "ERROR! Chrome driver version does not match browser version")
-        message = 'ERROR! Chrome driver version does not match browser version.\nPlease download and use the correct drivers.\n'
+        message = 'ERROR! Chrome driver version does not match browser version.\nPlease download and place correct driver in the same folder as the exe.\n'
     except Exception as e:
         logging.exception("ERROR! did not complete scraping")
         message = 'ERROR! Did not fully complete determining price\n'
