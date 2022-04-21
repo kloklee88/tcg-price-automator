@@ -13,6 +13,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import SessionNotCreatedException
 from datetime import datetime
 from tkinter import *
+from tkinter import messagebox as msg
+import tkinter as tk
 from tkinter import ttk, filedialog
 from ttkthemes import ThemedTk, ThemedStyle
 from PIL import Image, ImageTk
@@ -347,7 +349,9 @@ class Window(Frame):
         self.progress_percent = ttk.Label(self.content, text='')
         self.progress_percent.place(relx=0.5, rely=0.575, anchor=CENTER)
 
-        ttk.Label(self.content, textvariable=self.response).place(
+        self.message_label = tk.Label(
+            self.content, textvariable=self.response)
+        self.message_label.place(
             relx=0.5, rely=0.7, anchor=CENTER)
 
         ttk.Button(self.content, text='Check chrome version', command=self.check_chrome_version,
@@ -369,7 +373,8 @@ class Window(Frame):
         exit()
 
     def check_chrome_version(self):
-        webbrowser.open_new_tab("https://www.whatismybrowser.com/detect/what-version-of-chrome-do-i-have")
+        webbrowser.open_new_tab(
+            "https://www.whatismybrowser.com/detect/what-version-of-chrome-do-i-have")
 
     def download_driver(self):
         webbrowser.open_new_tab("https://chromedriver.chromium.org/downloads")
@@ -387,6 +392,11 @@ class Window(Frame):
         self.progress_percent['text'] = '100%'
         self.progress['value'] = 100
         self.response.set(result)
+        if "ERROR" in result:
+            logging.info("Error message will be displayed")
+            self.message_label.config(fg="maroon")
+            message = result.split("! ")[1]
+            msg.showerror("Error", message)
 
     def process(self):
         control_thread = threading.Thread(target=self.run, daemon=True)
